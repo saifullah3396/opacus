@@ -30,9 +30,7 @@ def make_functional(mod: nn.Module, disable_autograd_tracking: bool = False):
         stateless_mod.allow_grad_accumulation()
 
     def fmodel(new_params_values, *args, **kwargs):
-        new_params_dict = {
-            name: value for name, value in zip(params_names, new_params_values)
-        }
+        new_params_dict = {name: value for name, value in zip(params_names, new_params_values)}
         return torch.func.functional_call(stateless_mod, new_params_dict, args, kwargs)
 
     if disable_autograd_tracking:
@@ -51,9 +49,7 @@ def prepare_layer(layer, batch_first=True):
         batch_first: whether the input is batch_first or not
     """
     if len(list(layer.buffers())) > 0:
-        raise NotImplementedError(
-            "This layer has buffers and is not supported by Opacus"
-        )
+        raise NotImplementedError("This layer has buffers and is not supported by Opacus")
     if type(layer) is nn.EmbeddingBag:
         raise NotImplementedError("Functorch does not support EmbeddingBag yet")
 
@@ -61,14 +57,14 @@ def prepare_layer(layer, batch_first=True):
 
     def compute_loss_stateless_model(params, activations, backprops):
         if batch_first or type(layer) is RNNLinear:
-            batched_activations = activations.unsqueeze(0)
+            batched_activations = [activation.unsqueeze(0) for activation in activations]
             batched_backprops = backprops.unsqueeze(0)
         else:
             # If batch_first is False, the batch dimension is the second dimension
             batched_activations = activations.unsqueeze(1)
             batched_backprops = backprops.unsqueeze(1)
 
-        output = flayer(params, batched_activations)
+        output = flayer(params, *batched_activations)
         loss = (output * batched_backprops).sum()
         return loss
 
@@ -91,9 +87,7 @@ def ft_compute_per_sample_gradient(layer, activations, backprops):
     if not hasattr(layer, "ft_compute_sample_grad"):
         prepare_layer(layer)
 
-    per_sample_grads = layer.ft_compute_sample_grad(
-        parameters, activations[0], backprops
-    )
+    per_sample_grads = layer.ft_compute_sample_grad(parameters, activations, backprops)
 
     ret = {}
     for i_p, p in enumerate(parameters):
