@@ -72,7 +72,7 @@ def prepare_layer(layer, batch_first=True):
     # Note that the vmap is done on the first dimension, regardless of batch_first
     # This is because the activations and backprops given by the GradSampleModule
     # are always batch_first=True
-    layer.ft_compute_sample_grad = vmap(ft_compute_grad, in_dims=(None, 0, 0))
+    layer.ft_compute_sample_grad = vmap(ft_compute_grad, in_dims=(None, 0, 0), randomness='same')
 
 
 def ft_compute_per_sample_gradient(layer, activations, backprops):
