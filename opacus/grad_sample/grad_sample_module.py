@@ -32,7 +32,6 @@ from opacus.utils.module_utils import (
     trainable_parameters,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -283,7 +282,9 @@ class GradSampleModule(AbstractGradSampleModule):
 
         if not hasattr(module, "activations"):
             module.activations = []
-        module.activations.append([t.detach() for t in forward_input])  # pyre-ignore
+        module.activations.append(
+            [t.detach() if isinstance(t, torch.Tensor) else t for t in forward_input]
+        )  # pyre-ignore
 
         for _, p in trainable_parameters(module):
             p._forward_counter += 1
@@ -508,7 +509,8 @@ def _get_batch_size(*, module: nn.Module, batch_dim: int) -> int:
         # out is typically a tuple of one element (x)
         # for embedding bag, it is a tuple of two elements (x, offsets)
         # where len(offsets) = batch_size
-        if out[-1].shape[batch_dim] > max_batch_len:
-            max_batch_len = out[-1].shape[batch_dim]
+        correct_out = out[-1] if isinstance(out[-1], torch.Tensor) else out[-2]
+        if correct_out.shape[batch_dim] > max_batch_len:
+            max_batch_len = correct_out.shape[batch_dim]
 
     return max_batch_len
