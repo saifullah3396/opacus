@@ -110,6 +110,7 @@ class PrivacyEngine:
         clipping: str = "flat",
         noise_generator=None,
         grad_sample_mode="hooks",
+        noise_multiplicity: int = 1,
     ) -> DPOptimizer:
         if isinstance(optimizer, DPOptimizer):
             optimizer = optimizer.original_optimizer
@@ -134,6 +135,7 @@ class PrivacyEngine:
             loss_reduction=loss_reduction,
             generator=generator,
             secure_mode=self.secure_mode,
+            noise_multiplicity=noise_multiplicity,
         )
 
     def _prepare_data_loader(
@@ -274,6 +276,7 @@ class PrivacyEngine:
         clipping: str = "flat",
         noise_generator=None,
         grad_sample_mode: str = "hooks",
+        noise_multiplicity: int = 1,
     ) -> Tuple[GradSampleModule, DPOptimizer, DataLoader]:
         """
         Add privacy-related responsibilities to the main PyTorch training objects:
@@ -380,6 +383,7 @@ class PrivacyEngine:
             distributed=distributed,
             clipping=clipping,
             grad_sample_mode=grad_sample_mode,
+            noise_multiplicity=noise_multiplicity,
         )
 
         optimizer.attach_step_hook(
@@ -404,6 +408,7 @@ class PrivacyEngine:
         clipping: str = "flat",
         noise_generator=None,
         grad_sample_mode: str = "hooks",
+        noise_multiplicity: int = 1,
         **kwargs,
     ):
         """
@@ -487,6 +492,7 @@ class PrivacyEngine:
             grad_sample_mode=grad_sample_mode,
             poisson_sampling=poisson_sampling,
             clipping=clipping,
+            noise_multiplicity=noise_multiplicity,
         )
 
     def get_epsilon(self, delta):

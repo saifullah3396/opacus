@@ -23,7 +23,6 @@ from opt_einsum.contract import contract
 from torch import nn
 from torch.optim import Optimizer
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -204,6 +203,7 @@ class DPOptimizer(Optimizer):
         loss_reduction: str = "mean",
         generator=None,
         secure_mode: bool = False,
+        noise_multiplicity: int = 1,
     ):
         """
 
@@ -245,6 +245,7 @@ class DPOptimizer(Optimizer):
         self.state = self.original_optimizer.state
         self._step_skip_queue = []
         self._is_last_step_skipped = False
+        self.noise_multiplicity = noise_multiplicity
 
         for p in self.params:
             p.summed_grad = None
@@ -394,21 +395,29 @@ class DPOptimizer(Optimizer):
         Stores clipped and aggregated gradients into `p.summed_grad```
         """
 
-        if len(self.grad_samples[0]) == 0:
-            # Empty batch
-            per_sample_clip_factor = torch.zeros((0,))
-        else:
-            per_param_norms = [
-                g.reshape(len(g), -1).norm(2, dim=-1) for g in self.grad_samples
-            ]
-            per_sample_norms = torch.stack(per_param_norms, dim=1).norm(2, dim=1)
-            per_sample_clip_factor = (
-                self.max_grad_norm / (per_sample_norms + 1e-6)
-            ).clamp(max=1.0)
+        per_param_norms = [
+            g.view(
+                g.shape[0] // self.noise_multiplicity,
+                self.noise_multiplicity,
+                *g.shape[1:],
+            )
+            .mean(dim=1)
+            .view(g.shape[0] // self.noise_multiplicity, -1)
+            .norm(2, dim=-1)
+            for g in self.grad_samples
+        ]
+        per_sample_norms = torch.stack(per_param_norms, dim=1).norm(2, dim=1)
+        per_sample_clip_factor = (self.max_grad_norm / (per_sample_norms + 1e-6)).clamp(
+            max=1.0
+        )
 
         for p in self.params:
             _check_processed_flag(p.grad_sample)
             grad_sample = self._get_flat_grad_sample(p)
+            grad_data_point_augmentation = grad_sample.reshape(
+                -1, self.noise_multiplicity, *grad_sample.shape[1:]
+            )
+            grad_sample = grad_data_point_augmentation.mean(dim=1)
             grad = contract("i,i...", per_sample_clip_factor, grad_sample)
 
             if p.summed_grad is not None:
